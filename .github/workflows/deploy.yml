@@ -55,32 +55,52 @@ jobs:
 
       - name: Validate required secrets
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          HF_TOKEN_RAW: ${{ secrets.HF_TOKEN }}
+          HF_USERNAME_RAW: ${{ secrets.HF_USERNAME }}
         run: |
           set -e
+          # Strip leading/trailing whitespace and CR/LF that frequently sneak
+          # in via copy-paste. Without this, httpx rejects the auth header
+          # with: LocalProtocolError: Illegal header value b'<token> '
+          HF_TOKEN=$(printf '%s' "$HF_TOKEN_RAW" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+          HF_USERNAME=$(printf '%s' "$HF_USERNAME_RAW" | tr -d '\r\n' | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')
+
           [ -n "$HF_TOKEN" ]    || { echo "::error::Missing secret HF_TOKEN"; exit 1; }
           [ -n "$HF_USERNAME" ] || { echo "::error::Missing secret HF_USERNAME"; exit 1; }
-          # Detect placeholder values that mean "you copied the masked version"
-          if [ "$HF_TOKEN" = "***" ] || [ "${#HF_TOKEN}" -lt 20 ]; then
-            echo "::error::HF_TOKEN looks invalid (too short or placeholder)."
+
+          # Detect placeholder / truncated values
+          if [ "${#HF_TOKEN}" -lt 20 ]; then
+            echo "::error::HF_TOKEN looks invalid (length ${#HF_TOKEN} < 20 after trimming)."
             echo "::error::Create a fresh token at https://huggingface.co/settings/tokens"
             echo "::error::and copy it RIGHT AFTER creation (HF only shows it once)."
             exit 1
           fi
           case "$HF_TOKEN" in
-            hf_*) ;;  # ok
+            hf_*) ;;
             *)
               echo "::warning::HF_TOKEN doesn't start with 'hf_'. If the next step"
               echo "::warning::fails with an auth error, your token is malformed."
               ;;
           esac
 
+          # Warn (don't fail) if the user pasted with surrounding whitespace
+          if [ "$HF_TOKEN" != "$HF_TOKEN_RAW" ]; then
+            echo "::warning::HF_TOKEN had surrounding whitespace; trimmed before use."
+            echo "::warning::Update the secret to remove leading/trailing spaces or newlines."
+          fi
+
+          # Export the cleaned values for the next step
+          {
+            echo "HF_TOKEN=$HF_TOKEN"
+            echo "HF_USERNAME=$HF_USERNAME"
+          } >> "$GITHUB_ENV"
+
       - id: bootstrap
         name: Bootstrap HF (dataset + space + secrets + upload)
         env:
-          HF_TOKEN: ${{ secrets.HF_TOKEN }}
-          HF_USERNAME: ${{ secrets.HF_USERNAME }}
+          # HF_TOKEN and HF_USERNAME come from $GITHUB_ENV via the previous
+          # validation step (already trimmed of whitespace). Don't override
+          # them here with the raw secrets.
           HF_SPACE_NAME: ${{ vars.HF_SPACE_NAME || 'swarmclaw' }}
           HF_DATASET_NAME: ${{ vars.HF_DATASET_NAME || 'swarmclaw-state' }}
           SPACE_HARDWARE: ${{ vars.SPACE_HARDWARE || 'cpu-basic' }}
