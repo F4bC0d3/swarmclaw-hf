@@ -44,8 +44,12 @@ sync_loop() {
 # ---------------------------------------------------------------------------
 # The upstream image's CMD launches the server; we re-invoke it the same way.
 # `swarmclaw` is on PATH in the official image.
-log "Starting SwarmClaw on ${HOST:-0.0.0.0}:${PORT:-7860}"
-swarmclaw &
+log "Starting SwarmClaw on ${HOSTNAME:-0.0.0.0}:${PORT:-7860}"
+# Upstream image (ghcr.io/swarmclawai/swarmclaw) is a Next.js standalone build:
+#   ENTRYPOINT ["docker-entrypoint.sh"], CMD ["node","server.js"], WORKDIR /app
+# There is no "swarmclaw" binary on PATH; launch the same way the upstream image does.
+cd /app
+docker-entrypoint.sh node server.js &
 APP_PID=$!
 
 sync_loop &
