@@ -49,7 +49,10 @@ from huggingface_hub.utils import (
 
 
 def env(name: str, default: str | None = None, required: bool = False) -> str:
-    v = os.environ.get(name, default)
+    raw = os.environ.get(name, default)
+    # Strip whitespace/newlines that often sneak in via copy-paste of secrets.
+    # An HF token with a trailing "\n" produces httpx LocalProtocolError later.
+    v = raw.strip() if isinstance(raw, str) else raw
     if required and not v:
         print(f"ERROR: missing required env {name}", file=sys.stderr)
         sys.exit(2)
@@ -270,9 +273,14 @@ def main() -> int:
     if cred_secret_generated:
         summary += [
             "",
-            "### Generated CREDENTIAL_SECRET",
+            "### ⚠ Generated CREDENTIAL_SECRET (save this — it won't be shown again)",
             "",
-            "(Stored only on the Space. To rotate, set `CREDENTIAL_SECRET` in GitHub secrets.)",
+            f"```\n{cred_secret_in}\n```",
+            "",
+            "Add this as `CREDENTIAL_SECRET` in your GitHub repo secrets so future",
+            "deploys keep using the same value. **Do not change it after you've",
+            "saved provider API keys in SwarmClaw** — those keys are encrypted",
+            "with this secret and would become unreadable.",
         ]
     append_summary("\n".join(summary))
 
