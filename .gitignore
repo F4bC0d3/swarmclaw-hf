@@ -1,0 +1,21 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Cloudflare Worker
+deploy/cloudflare-worker/node_modules/
+deploy/cloudflare-worker/.wrangler/
+deploy/cloudflare-worker/wrangler.toml
+deploy/cloudflare-worker/.dev.vars
+deploy/cloudflare-worker/secrets.json
+deploy/cloudflare-worker/deploy.log
+
+# Python
+__pycache__/
+*.pyc
+
+# Local secrets — never commit
+.env
+.env.*
