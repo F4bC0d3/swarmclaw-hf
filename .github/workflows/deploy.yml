@@ -59,8 +59,22 @@ jobs:
           HF_USERNAME: ${{ secrets.HF_USERNAME }}
         run: |
           set -e
-          [ -n "$HF_TOKEN" ]    || { echo "Missing secret HF_TOKEN"; exit 1; }
-          [ -n "$HF_USERNAME" ] || { echo "Missing secret HF_USERNAME"; exit 1; }
+          [ -n "$HF_TOKEN" ]    || { echo "::error::Missing secret HF_TOKEN"; exit 1; }
+          [ -n "$HF_USERNAME" ] || { echo "::error::Missing secret HF_USERNAME"; exit 1; }
+          # Detect placeholder values that mean "you copied the masked version"
+          if [ "$HF_TOKEN" = "***" ] || [ "${#HF_TOKEN}" -lt 20 ]; then
+            echo "::error::HF_TOKEN looks invalid (too short or placeholder)."
+            echo "::error::Create a fresh token at https://huggingface.co/settings/tokens"
+            echo "::error::and copy it RIGHT AFTER creation (HF only shows it once)."
+            exit 1
+          fi
+          case "$HF_TOKEN" in
+            hf_*) ;;  # ok
+            *)
+              echo "::warning::HF_TOKEN doesn't start with 'hf_'. If the next step"
+              echo "::warning::fails with an auth error, your token is malformed."
+              ;;
+          esac
 
       - id: bootstrap
         name: Bootstrap HF (dataset + space + secrets + upload)
